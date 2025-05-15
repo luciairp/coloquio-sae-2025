@@ -50,6 +50,8 @@ data_ER_estaca_season <- data_PM %>%
 data_ER_season
 data_ER_estaca_season
 
-ggplot(data_ER_estaca_season,aes(x=season,y=ER))+
-  geom_point()
+ggplot(data_ER_estaca_season,aes(x=season,y=ER, group=factor(estaca),color=factor(estaca)))+
+  geom_point()+
+  geom_line()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
