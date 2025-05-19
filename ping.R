@@ -10,8 +10,7 @@ data_PM <- data_PM %>%
 mutate(ER = pichon/huevo)
 
 ggplot(data_PM,aes(x=ER,y=season))+
-  geom_point(position = "jitter")+
-  scale_x_continuous(limits = c(0,1))
+  geom_point(position = "jitter")
 
 ERestaca <- data_PM %>% filter(season == "s10-11") %>% 
 ggplot(aes(x=ER,y=estaca))+
@@ -55,3 +54,9 @@ ggplot(data_ER_estaca_season,aes(x=season,y=ER, group=factor(estaca),color=facto
   geom_line()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
+
+data_amb <- read_csv("data_ambiental_PM_monte_leon.csv")
+str(data_amb)
+
+data_full <- data_PM %>% 
+  inner_join(data_amb, by = c("season"))

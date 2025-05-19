@@ -26,25 +26,47 @@ TP <- data_arroyos %>%
   slice(-c(9581:9604)) %>% 
   # sacar columnas redundantes:
   select(-am_pm,-hora, -fecha_formateada) %>% 
-  mutate(horaredonda = hour(fechahora))
+  mutate(horaredonda = hour(fechahora)) %>% 
+  mutate(season= case_when(
+    month(fechahora) < 5 | month(fechahora) > 10 ~ 'templado',
+    #fecha < "01/05/2018" | fecha >"31/10/2018" ~ 'templado',
+  .default = 'frio'  
+  ))
 
 head(TP)
 
 # x es QM , y es TP
 # quiero traer a Qm las mediciones que cumplen ser iguales en fecha y arroyo, para 
-airports |> 
-  semi_join(flights2, join_by(faa == origin))
-
 resultado <- Qm %>%
   inner_join(TP, by = c("arroyo", "fecha")) %>%
   filter(horaredonda >= 11, horaredonda <= 13)
+resultado$arroyo <- as.factor(resultado$arroyo)
 
-qvsp <- ggplot(resultado,aes(x=pabs,y=q))+
-  geom_point()
+qvsp <- ggplot(resultado,aes(x=pabs,y=q,color=arroyo))+
+  geom_point()+
+  facet_wrap(vars(season))
 qvsp
 
-qvst <- ggplot(resultado,aes(x=temp,y=q))+
+qvst <- ggplot(resultado,aes(x=temp,y=q,color=arroyo))+
   geom_point()
 qvst
 
-range(TP$pabs)
+plot <- ggplot(TP,aes(y=temp,group = arroyo))+
+  geom_boxplot()
+  
+plot
+
+temp <- ggplot(TP,aes(x=temp,group=arroyo))+
+  geom_boxplot()+
+  facet_wrap(vars(season))
+
+hist <- ggplot(TP,aes(x=temp))+
+  geom_histogram()+
+  facet_wrap(vars(arroyo))
+hist
+
+unique(resultado$arroyo)
+
+biplot <- ggplot(TP,aes(x=temp,y=pabs,colour = arroyo))+
+  geom_point()
+biplot
