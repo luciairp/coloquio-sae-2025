@@ -31,7 +31,8 @@ TP <- data_arroyos %>%
     month(fechahora) < 5 | month(fechahora) > 10 ~ 'templado',
     #fecha < "01/05/2018" | fecha >"31/10/2018" ~ 'templado',
   .default = 'frio'  
-  ))
+  )) %>% 
+  mutate(manejo = factor(manejo,c("sin","con")))
 
 head(TP)
 
@@ -47,18 +48,21 @@ qvsp <- ggplot(resultado,aes(x=pabs,y=q,color=arroyo))+
   facet_wrap(vars(season))
 qvsp
 
+TP$arroyo <- factor(TP$arroyo,levels=c("16","20","96","55","69","71","73"))
 qvst <- ggplot(resultado,aes(x=temp,y=q,color=arroyo))+
   geom_point()
 qvst
 
-plot <- ggplot(TP,aes(y=temp,group = arroyo))+
-  geom_boxplot()
-  
-plot
-
-temp <- ggplot(TP,aes(x=temp,group=arroyo))+
+temperatura <- ggplot(TP,aes(y=temp,group = arroyo,fill=manejo))+
   geom_boxplot()+
-  facet_wrap(vars(season))
+  theme_light()
+temperatura
+
+presion <- ggplot(TP,aes(y=pabs,group = arroyo, fill=manejo))+
+  geom_boxplot()+
+  theme_light()
+presion
+
 
 hist <- ggplot(TP,aes(x=temp))+
   geom_histogram()+
@@ -67,6 +71,12 @@ hist
 
 unique(resultado$arroyo)
 
-biplot <- ggplot(TP,aes(x=temp,y=pabs,colour = arroyo))+
-  geom_point()
+biplot <- ggplot(TP,aes(y=temp,x=pabs,colour = arroyo, z=arroyo))+
+  stat_ellipse(aes(group = arroyo, color = manejo))+
+  theme_light()
+
+
 biplot
+
+biplot <- ggplot(TP,aes(y=temp,t=pabs,colour = arroyo, z=arroyo))+
+  stat_density2d(geom="polygon", aes(fill = factor(arroyo)))
