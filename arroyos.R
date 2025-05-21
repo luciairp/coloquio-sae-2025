@@ -28,12 +28,19 @@ TP <- data_arroyos %>%
   select(-am_pm,-hora, -fecha_formateada) %>% 
   mutate(horaredonda = hour(fechahora)) %>% 
   mutate(season= case_when(
-    month(fechahora) < 5 | month(fechahora) > 10 ~ 'templado',
+    month(fechahora) < 9 & month(fechahora) > 5 ~ 'core_frio',
+    month(fechahora) < 2 | month(fechahora) > 11 ~ 'core_templado'
     #fecha < "01/05/2018" | fecha >"31/10/2018" ~ 'templado',
-  .default = 'frio'  
-  ))
+  #.default = '...'  
+  ))%>% 
+  mutate(manejo=factor(manejo, c("sin","con")))%>% 
+  mutate(month=month(fecha,label = TRUE, abbr = TRUE))
 
 head(TP)
+
+TP$arroyo<-factor(TP$arroyo,levels = c("16","20","96","55","69","71","73"))
+
+#write.csv(TP, "TP_edit.csv")
 
 # x es QM , y es TP
 # quiero traer a Qm las mediciones que cumplen ser iguales en fecha y arroyo, para 
@@ -56,17 +63,27 @@ plot <- ggplot(TP,aes(y=temp,group = arroyo))+
   
 plot
 
-temp <- ggplot(TP,aes(x=temp,group=arroyo))+
+temperatura <- ggplot(TP,aes(y=temp,group=arroyo, fill=manejo))+
   geom_boxplot()+
-  facet_wrap(vars(season))
+  theme_light()
 
-hist <- ggplot(TP,aes(x=temp))+
-  geom_histogram()+
-  facet_wrap(vars(arroyo))
-hist
 
-unique(resultado$arroyo)
+presion <- ggplot(TP,aes(y=pabs,group=arroyo, fill=manejo))+
+  geom_boxplot()+
+  theme_light()
+ 
+
 
 biplot <- ggplot(TP,aes(x=temp,y=pabs,colour = arroyo))+
   geom_point()
 biplot
+
+
+ellipses<-ggplot(TP,aes(y=temp,x=pabs,group = arroyo,color=arroyo))+
+stat_ellipse()+
+  theme_light()
+
+ellipse_month<-ggplot(TP, aes(y=temp, x=pabs, group=arroyo, color=manejo))+
+  stat_ellipse(level=.95)+
+  facet_wrap(vars(season))+
+  theme_light()

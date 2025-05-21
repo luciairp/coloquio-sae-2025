@@ -60,3 +60,7 @@ str(data_amb)
 
 data_full <- data_PM %>% 
   inner_join(data_amb, by = c("season"))
+
+head(data_full)
+
+#write.csv(data_full, "PM_Monte_Leon_full.csv")
