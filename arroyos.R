@@ -36,6 +36,7 @@ TP <- data_arroyos %>%
   mutate(manejo=factor(manejo, c("sin","con")))%>% 
   mutate(month=month(fecha,label = TRUE, abbr = TRUE))
 
+
 head(TP)
 
 TP$arroyo<-factor(TP$arroyo,levels = c("16","20","96","55","69","71","73"))
@@ -54,30 +55,28 @@ qvsp <- ggplot(resultado,aes(x=pabs,y=q,color=arroyo))+
   facet_wrap(vars(season))
 qvsp
 
+TP$arroyo <- factor(TP$arroyo,levels=c("16","20","96","55","69","71","73"))
 qvst <- ggplot(resultado,aes(x=temp,y=q,color=arroyo))+
   geom_point()
 qvst
 
 plot <- ggplot(TP,aes(y=temp,group = arroyo))+
   geom_boxplot()
-  
 plot
 
 temperatura <- ggplot(TP,aes(y=temp,group=arroyo, fill=manejo))+
   geom_boxplot()+
   theme_light()
 
-
 presion <- ggplot(TP,aes(y=pabs,group=arroyo, fill=manejo))+
   geom_boxplot()+
   theme_light()
  
 
-
-biplot <- ggplot(TP,aes(x=temp,y=pabs,colour = arroyo))+
-  geom_point()
+biplot <- ggplot(TP,aes(y=temp,x=pabs,colour = arroyo, z=arroyo))+
+  stat_ellipse(aes(group = arroyo, color = manejo))+
+  theme_light()
 biplot
-
 
 ellipses<-ggplot(TP,aes(y=temp,x=pabs,group = arroyo,color=arroyo))+
 stat_ellipse()+
@@ -87,3 +86,4 @@ ellipse_month<-ggplot(TP, aes(y=temp, x=pabs, group=arroyo, color=manejo))+
   stat_ellipse(level=.95)+
   facet_wrap(vars(season))+
   theme_light()
+
