@@ -195,6 +195,8 @@ table(data_PM_full$season)
 library(ordinal)
 library(splines)
 library(ggeffects)
+library(MuMIn)
+library(sjPlot)
 
 # Eliminar casos donde pichon == 3
 data_filtrada <- subset(data_PM_full, pichon %in% c(0, 1, 2))
@@ -211,8 +213,21 @@ data_filtrada$pichon <- factor(data_filtrada$pichon, ordered = TRUE)
 
 
 # Modelo ordinal con efecto no lineal de SAM
-modelo_no_lineal <- clm(pichon ~ ns(SSTA, df = 3), 
-                        data = data_filtrada)
+modelo_no_lineal <- clm(pichon ~ ns(SST, df = 2)+ns(Chla, df = 3)+ns(SAM, df = 2), 
+                        data = data_filtrada,na.action = na.fail)
+
+summary(modelo_no_lineal)
+dredge(modelo_no_lineal)
+tab_model(modelo_no_lineal)
+plot(ggpredict(modelo_no_lineal))
+
+cor.test(data_filtrada$SST,data_filtrada$SSTA)#r=0.9
+cor.test(data_filtrada$SST,data_filtrada$Chla)# r=0.5
+cor.test(data_filtrada$SSTA,data_filtrada$Chla)#0.7
+cor.test(data_filtrada$SAM, data_filtrada$SST)# 0.34
+cor.test(data_filtrada$SAM, data_filtrada$SSTA)#0.27
+cor.test(data_filtrada$SAM, data_filtrada$Chla)#0.15
+
 
 # Predicciones
 library(ggeffects)
