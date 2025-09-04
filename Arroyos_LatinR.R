@@ -87,6 +87,11 @@ qqnorm(TP1$temp); qqline(TP1$temp, col = "red")
 hist(TP1$pabs, breaks = 50, col = "blue")
 qqnorm(TP1$pabs); qqline(TP1$pabs, col = "red")
 
+hist(TP_hora$temp, breaks = 50, col = "lightblue")
+qqnorm(TP_hora$temp); qqline(TP$temp, col = "red")
+hist(TP_hora$pabs, breaks = 50, col = "lightblue")
+qqnorm(TP_hora$pabs); qqline(TP$pabs, col = "red")
+
 hist <- ggplot(TP,aes(x=temp))+
   geom_histogram()+
   facet_wrap(vars(arroyo))
@@ -253,122 +258,10 @@ ellipse_month<-ggplot(TP1, aes(y=temp, x=pabs, group=arroyo, color=manejo))+
   facet_wrap(vars(month(fechahora)))+
   theme_light()
 ellipse_month
-##########################################################
-#MANOVA
-#sigue a https://www.r-bloggers.com/2021/11/manovamultivariate-analysis-of-variance-using-r/
-##https://www.datanovia.com/en/lessons/one-way-manova-in-r/
-#no se cumple ningún supuesto para sorpresa de nadie pero se especifica lo hecho
 
-#normalidad univariada de las variables respuestas 
-
-shapiro.test(data_diaria$temp_media_diaria)
-shapiro.test(data_diaria$pabs_media_diaria)
-shapiro.test(data$temp_media_diaria)
-shapiro.test(data$pabs_media_diaria)
-shapiro.test(TP_hora$pabs)
-shapiro.test(TP_hora$temp)
-
-datos <- TP_hora %>%
-  select(pabs, temp, manejo, arroyo, season)
-
-data <- TP1 %>%
-  select(season, manejo, fecha, arroyo, pabs, temp)%>%
-  group_by(fecha, arroyo, manejo, season) %>%
-  summarise(
-    temp_media_diaria = mean(temp, na.rm = TRUE),
-    pabs_media_diaria = mean(pabs, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-#Anderson-Darling normality test para mas de 5000 observaciones
-ad.test(TP_hora$temp)
-ad.test(TP_hora$pabs)
-
-ad.test(TP1$pabs)
-ad.test(TP1$temp)
-
-ad.test(data$pabs_media_diaria)
-ad.test(data$temp_media_diaria)
-
-hist(TP1$temp, breaks = 50, col = "blue")
-qqnorm(TP1$temp); qqline(TP1$temp, col = "red")
-hist(TP1$pabs, breaks = 50, col = "blue")
-qqnorm(TP1$pabs); qqline(TP1$pabs, col = "red")
-
-hist(TP_hora$temp, breaks = 50, col = "lightblue")
-qqnorm(TP_hora$temp); qqline(TP$temp, col = "red")
-hist(TP_hora$pabs, breaks = 50, col = "lightblue")
-qqnorm(TP_hora$pabs); qqline(TP$pabs, col = "red")
-
-#para verificar los grupos
-datos %>%
-  group_by(season) %>%
-  summarise(n = n())
-datos %>%
-  group_by(manejo) %>%
-  summarise(n = n())
-datos %>%
-  group_by(manejo,season) %>%
-  summarise(n = n())
-
-datos %>%
-  group_by(manejo) %>%
-  get_summary_stats(pabs, temp, type = "mean_sd")
-datos %>%
-  group_by(manejo,season) %>%
-  get_summary_stats(pabs, temp, type = "mean_sd")
-
-datos %>% 
-  group_by(manejo) %>%  
-  shapiro_test(pabs, temp)
-
-datos %>% 
-  group_by(season) %>%  
-  shapiro_test(pabs, temp)
-
-datos %>% 
-  group_by(manejo,season) %>%  
-  shapiro_test(pabs, temp)
-
-
-#normalidad multivariada 
-mardia(TP_hora[, c("pabs", "temp")])$mv.test
-mardia(TP1[, c("pabs", "temp")])$mv.test #este da un vector de 33,8Gb por eso se trabaja con la matriz e una medición por hora
-mardia(data_diaria[, c("pabs_media_diaria", "temp_media_diaria")])$mv.test
-mardia(data[, c("pabs_media_diaria", "temp_media_diaria")])$mv.test
-
-#homogeneidad de varianzas 
-library(rstatix)
-box_m(datos[, c("pabs", "temp")], group = datos$manejo)
-box_m(datos[, c("pabs", "temp")], group = datos$season)
-#no cumple
-
-#modelo manova
-mod1 <- manova(cbind(pabs, temp) ~ manejo, data = TP1)
-summary(mod1, test = "Pillai") #pillai es mas rousto al no cumplimiento de supuestos
-mod2 <- manova(cbind(pabs, temp) ~ season, data = TP1)
-summary(mod2, test = "Pillai")
-mod3 <- manova(cbind(pabs, temp) ~ manejo * season, data = TP1)
-summary(mod3, test = "Pillai")
-
-summary.aov(mod3) #analisis univariado post manova, para pabs y temp por separado
-
-mod4 <- manova(cbind(pabs, temp) ~ manejo, data = TP_hora)
-summary(mod4, test = "Pillai") #pillai es mas rousto al no cumplimiento de supuestos
-mod5 <- manova(cbind(pabs, temp) ~ season, data = TP_hora)
-summary(mod5, test = "Pillai")
-mod6 <- manova(cbind(pabs, temp) ~ manejo * season, data = TP_hora)
-summary(mod6, test = "Pillai")
-
-summary.aov(mod6) #analisis univariado post manova, para pabs y temp por separado
-
-mod7 <- manova(cbind(pabs_media_diaria, temp_media_diaria) ~ manejo, data = data)
-summary(mod7, test = "Pillai") #pillai es mas rousto al no cumplimiento de supuestos
-mod8 <- manova(cbind(pabs_media_diaria, temp_media_diaria) ~ season, data = data)
-summary(mod8, test = "Pillai")
-mod9 <- manova(cbind(pabs_media_diaria, temp_media_diaria) ~ manejo * season, data = data)
-summary(mod9, test = "Pillai")
-
-summary.aov(mod9) #analisis univariado post manova, para pabs y temp por separado
 ###############################################################################################################
+## CODIGO DE SIBER ACTUALIZADO DE: 
+##https://cran.r-project.org/web/packages/SIBER/vignettes/siber-comparing-populations.html
 
+rm(list=ls())
+graphics.off()
