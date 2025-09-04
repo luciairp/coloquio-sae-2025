@@ -171,8 +171,6 @@ data_PM_full$pichon <- factor(data_PM_full$pichon, ordered = TRUE)
 # Pasar season a factor (lo estaba tomando como chr por default)
 data_PM_full$season <- as.factor(data_PM_full$season)
 
-data_PM_full$season <- as.factor(data_PM_full$season)
-
 # Modelo ordinal
 modelo_ordinal <- polr(pichon ~ season, data = data_PM_full, Hess = TRUE)
 modelo_ordinal <- polr(pichon ~ SAM, data = data_PM_full, Hess = TRUE)
@@ -238,29 +236,61 @@ library(dplyr)
 library(vegan)
 
 
-data_multivariado <- data_filtrada %>%
-  dplyr::select(pichon, SST, SSTA, Chla, SAM)
+data_multivariado <- data_amb %>%
+  dplyr::select(season, SST, SSTA, Chla, SAM)
 
-data_multivariado<-as.numeric(data_multivariado$pichon)
+data_multivariado <- column_to_rownames(data_multivariado,'season')
 
 str(data_multivariado)
+euc <- vegdist(data_multivariado, method = "euclidean", na.rm = T)
 
-data_multivariado<-as.matrix(data_multivariado)
-
-nmds <- rda(data_multivariado)
-biplot(nmds)
+nmds <- metaMDS(euc,k=2,trymax = 100)
 
 nmds$stress
 stressplot(nmds)
 stressplot(nmds, pch = 19, p.col = "gray70", l.col = "black")
 plot(nmds)
 
+plot(nmds, type = "n")  # Gráfico vacío para personalizar
+# Añadir los puntos de las muestras
+points(nmds, display = "sites", pch = 21, bg = "lightblue", col = "black", cex = 1.5)
+
+# Añadir las especies (vectores de especies)
+ordisurf(nmds ~ data_multivariado$SAM, col = "red", add = TRUE)
+ordisurf(nmds ~ data_multivariado$Chla, col = "darkgreen", add = TRUE)
+ordisurf(nmds ~ data_multivariado$SST, col = "blue", add = TRUE)
+ordisurf(nmds ~ data_multivariado$SSTA, col = "darkviolet", add = TRUE)
 
 
+# Añadir etiquetas
+text(nmds_result, display = "species", col = "darkred", cex = 1.2)
+text(nmds, display = "sites", col = "black", pos = 4, cex = 0.9)
 
 
+# Ajustar variables ambientales al NMDS
+fit <- envfit(nmds, data_multivariado, perm = 999, na.rm=T)
 
+# Extraer coordenadas de sitios
+sites <- as.data.frame(scores(nmds, display = "sites"))
+sites$season <- rownames(sites)
 
+# Extraer vectores de variables ambientales
+species <- as.data.frame(scores(fit, display = "vectors"))
+species <- cbind(species, Variable = rownames(species))
 
-
-  
+# Plot con flechas
+ggplot() +
+  geom_point(data = sites, aes(x = NMDS1, y = NMDS2),
+             color = "gray20", size = 3, alpha = 0.8) +
+  geom_text(data = sites, aes(x = NMDS1, y = NMDS2, label = season),
+            vjust = -0.7, size = 3, color = "gray20") +
+  geom_segment(data = species,
+               aes(x = 0, y = 0, xend = NMDS1, yend = NMDS2),
+               arrow = arrow(length = unit(0.25,"cm")),
+               color = "darkviolet", linewidth = 0.7) +
+  geom_text(data = species,
+            aes(x = NMDS1, y = NMDS2, label = Variable),
+            color = "darkviolet", vjust = -0.7, size = 3.5) +
+  theme_minimal(base_size = 14) +
+  labs(title = "NMDS con variables ambientales",
+       x = "NMDS1", y = "NMDS2")
