@@ -189,7 +189,7 @@ table(data_PM_full$pichon,data_PM_full$season)
 table(data_PM_full$season)
 
 
-#### Con no linealidad
+#### Con no linealidad ---> nos quedamos con este
 library(ordinal)
 library(splines)
 library(ggeffects)
@@ -210,14 +210,8 @@ levels(data_filtrada$pichon)
 data_filtrada$pichon <- factor(data_filtrada$pichon, ordered = TRUE)
 
 
-# Modelo ordinal con efecto no lineal de SAM
-modelo_no_lineal <- clm(pichon ~ ns(SST, df = 2)+ns(Chla, df = 3)+ns(SAM, df = 2), 
-                        data = data_filtrada,na.action = na.fail)
-
-summary(modelo_no_lineal)
-dredge(modelo_no_lineal)
-tab_model(modelo_no_lineal)
-plot(ggpredict(modelo_no_lineal))
+# Modelo ordinal con efecto no lineal 
+# 1) Analisis de correlaciones entre variables ambientales
 
 cor.test(data_filtrada$SST,data_filtrada$SSTA)#r=0.9
 cor.test(data_filtrada$SST,data_filtrada$Chla)# r=0.5
@@ -226,10 +220,53 @@ cor.test(data_filtrada$SAM, data_filtrada$SST)# 0.34
 cor.test(data_filtrada$SAM, data_filtrada$SSTA)#0.27
 cor.test(data_filtrada$SAM, data_filtrada$Chla)#0.15
 
+#2) Modelo
+modelo_no_lineal <- clm(pichon ~ ns(SST, df = 2)+ns(Chla, df = 3)+ns(SAM, df = 2), 
+                        data = data_filtrada,na.action = na.fail)
+
+summary(modelo_no_lineal)
+dredge(modelo_no_lineal)
+tab_model(modelo_no_lineal)
+
 
 # Predicciones
 library(ggeffects)
 plot(ggpredict(modelo_no_lineal, terms = "SSTA [all]"))
+
+#### GRAFICAR ####
+library(ggeffects)
+library(ggplot2)
+plot(ggpredict(modelo_no_lineal))
+# Renombrando palenes
+
+# Obtener predicciones respetando los splines
+pred_sst  <- ggpredict(modelo_no_lineal, terms = "SST [all]")
+pred_chla <- ggpredict(modelo_no_lineal, terms = "Chla [all]")
+pred_sam  <- ggpredict(modelo_no_lineal, terms = "SAM [all]")
+
+# Modificar los niveles del factor que controla las facetas/categorias
+pred_sst$response.level  <- factor(pred_sst$response.level,
+                                   levels = c("1", "2", "3"),
+                                   labels = c("0 pichón", "1 pichón", "2 pichones"))
+pred_chla$response.level <- factor(pred_chla$response.level,
+                                   levels = c("1", "2", "3"),
+                                   labels = c("0 pichón", "1 pichón", "2 pichones"))
+pred_sam$response.level  <- factor(pred_sam$response.level,
+                                   levels = c("1", "2", "3"),
+                                   labels = c("0 pichón", "1 pichón", "2 pichones"))
+
+# Graficar 
+plot(pred_sst)  + ggtitle("Efecto de la temperatura superficial del mar (SST)")
+plot(pred_chla) + ggtitle("Efecto de la clorofila-a (Chla)")
+plot(pred_sam)  + ggtitle("Efecto del índice ")
+
+
+
+
+
+
+
+
 
 #### Multivariado ####
 library(dplyr)
