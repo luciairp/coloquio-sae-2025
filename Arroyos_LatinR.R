@@ -240,9 +240,11 @@ biplot_00 <- ggplot(TP_hora, aes(x = pabs, y = temp, colour = manejo)) +
   theme_light()
 biplot_00
 
-TP_hora <- TP_hora %>%
-  filter(season != "medio")
-biplot_000 <- ggplot(TP_hora, aes(x = pabs, y = temp, colour = manejo)) +
+#elipses con datos de solo una hora y para las estaciones core frio y core templado
+TP_hora.2 <- TP_hora %>%
+  filter(season %in% c("core_frio", "core_templado"))
+
+biplot_000 <- ggplot(TP_hora.2, aes(x = pabs, y = temp, colour = manejo)) +
   stat_ellipse(aes(group = arroyo, color = manejo), level = 0.40)+
   facet_grid(.~season) +
   theme_light()
@@ -267,7 +269,7 @@ ellipse_month
 # -----------------------------
 # 1. 
 # -----------------------------
-set.seed(123)
+
 rm(list=ls())
 graphics.off()
 
@@ -352,6 +354,208 @@ mydata3<-as.data.frame(mydata3)
 mydata3$group<-as.factor(mydata3$group)
 mydata3$community<-as.factor(mydata3$community)
 
+# -----------------------------
+# 2. Crear el objeto SIBER
+# -----------------------------
+# create the siber object
+siber.data<- createSiberObject(mydata2)
+
+siber.data.3<- createSiberObject(mydata3)
+
+# Calculate sumamry statistics for each group: TA, SEA and SEAc
+group.ML <- groupMetricsML(siber.data)
+print(group.ML)
+
+community.ML <- communityMetricsML(siber.data)
+print(community.ML)
+
+#core frio
+group.ML.3 <- groupMetricsML(siber.data.3)
+print(group.ML.3)
+
+community.ML.3 <- communityMetricsML(siber.data.3)
+print(community.ML.3)
+
+#graficar las metricas de comunidad
+#convertrir la tabla a formato largo
+library(tidyverse)
+
+# Convertimos la matriz de core_templado a data frame largo
+comm_df <- as.data.frame(community.ML) %>%
+  rownames_to_column("metric") %>%
+  pivot_longer(cols = -metric, names_to = "community", values_to = "value")
+
+comm_df
+
+
+ggplot(comm_df, aes(x = community, y = value, fill = community)) +
+  geom_col(width = 0.6, color = "black") +
+  facet_wrap(~ metric, scales = "free_y") +
+  scale_fill_manual(values = c("tan3", "forestgreen")) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Comparación de métricas SIBER por tipo de manejo CT",
+    x = "Tipo de manejo",
+    y = "Valor de la métrica"
+  ) +
+  theme(legend.position="none")
+
+# Convertimos la matriz de core_frio a data frame largo
+comm_df.3 <- as.data.frame(community.ML.3) %>%
+  rownames_to_column("metric") %>%
+  pivot_longer(cols = -metric, names_to = "community", values_to = "value")
+
+comm_df.3
+
+
+ggplot(comm_df.3, aes(x = community, y = value, fill = community)) +
+  geom_col(width = 0.6, color = "black") +
+  facet_wrap(~ metric, scales = "free_y") +
+  scale_fill_manual(values = c("tan3", "forestgreen")) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Comparación de métricas SIBER por tipo de manejo CF",
+    x = "Tipo de manejo",
+    y = "Valor de la métrica"
+  ) +
+  theme(legend.position="none")
+
+
+# Create lists of plotting arguments to be passed onwards to each 
+# of the three plotting functions.
+community.hulls.args <- list(col = 1, lty = 1, lwd = 1)
+group.ellipses.args  <- list(n = 100, p.interval = NULL, lty = 1, lwd = 2)
+
+group.hull.args      <- list(lty = 2)
+
+par(mfrow=c(1,1))
+
+plotSiberObject(siber.data,
+                ax.pad = 2, 
+                hulls = F, community.hulls.args, 
+                ellipses = T, group.ellipses.args,
+                group.hulls = F, group.hull.args,
+                bty = "L",
+                iso.order = c(1,2)
+)
+# -----------------------------
+# 3. Graficar los datos y las elipses
+# -----------------------------
+plotSiberObject(
+  siber.data,
+  ax.pad = 1,
+  hulls = FALSE,   # no mostrar convex hulls
+  ellipses = TRUE, # mostrar las elipses SEA
+  group.hulls.args = list(col = "gray"),
+  ellipses.args = list(n = 100, lwd = 2)
+)
+title("Espacio temperatura-presión (elipses SIBER)")
+
+# -----------------------------
+# 4. Calcular métricas de elipses SEA y SEAB
+# -----------------------------
+# SEA (Standard Ellipse Area)
+#SEA <- siberEllipses(siber.data)
+#SEA
+#tapply(siber.data$original.data$iso1, siber.data$original.data$group, sd)
+#tapply(siber.data$original.data$iso2, siber.data$original.data$group,sd)
+
+
+# Definir los priors (según recomendación del paquete SIBER)
+priors <- list(
+  R = 1 * diag(2),   # matriz de covarianza inicial
+  k = 2,              # número de dimensiones
+  tau.mu = 1.0E-3     # precisión del prior para la media
+)
+# Parámetros MCMC para la simulación bayesiana
+parms <- list(
+  n.iter = 2 * 10^4,  # número total de iteraciones
+  n.burnin = 1 * 10^3, # iteraciones de burn-in
+  n.thin = 10,         # frecuencia de muestreo
+  n.chains = 2          # número de cadenas
+)
+
+# Ajustar modelo bayesiano para core_templado
+ellipses.post.ct <- siberMVN(siber.data, parms, priors)
+
+# Ajustar modelo bayesiano para core_frio
+ellipses.post.cf <- siberMVN(siber.data.3, parms, priors)
+
+# Core templado
+SEA.B.ct <- siberEllipses(ellipses.post.ct)
+SEA.B.ct.summary <- siberDensityPlot(SEA.B.ct, xticklabels = levels(mydata2$group), 
+                                     xlab = "Grupos", ylab = "SEA (bayesiana)",
+                                     main = "Distribución posterior SEA - core templado")
+SEA.B.ct.summary
+
+# Core frío
+SEA.B.cf <- siberEllipses(ellipses.post.cf)
+SEA.B.cf.summary <- siberDensityPlot(SEA.B.cf, xticklabels = levels(mydata3$group),
+                                     xlab = "Grupos", ylab = "SEA (bayesiana)",
+                                     main = "Distribución posterior SEA - core frío")
+SEA.B.cf.summary
+
+colnames(SEA.B.ct) <- c("16","20","96","55","69","71","73")
+colnames(SEA.B.cf) <- c("16","20","96","55","69","71","73")
+
+#Comparar SEA entre comunidades (sin vs con manejo)
+# Definir a qué comunidad pertenece cada arroyo
+sin_manejo <- c("16", "20", "96")
+con_manejo <- c("55", "69", "71", "73")
+
+# Calcular promedio de SEA por comunidad en cada iteración
+SEA.B.ct.sin <- rowMeans(SEA.B.ct[, sin_manejo])
+SEA.B.ct.con <- rowMeans(SEA.B.ct[, con_manejo])
+
+SEA.B.cf.sin <- rowMeans(SEA.B.cf[, sin_manejo])
+SEA.B.cf.con <- rowMeans(SEA.B.cf[, con_manejo])
+
+# Probabilidad bayesiana de que SEA(sin) > SEA(con)
+SEA.B.ct.prob <- mean(SEA.B.ct.sin > SEA.B.ct.con)
+SEA.B.cf.prob <- mean(SEA.B.cf.sin > SEA.B.cf.con)
+
+cat("Probabilidad SEA(sin) > SEA(con) - Core templado:", SEA.B.ct.prob, "\n")
+cat("Probabilidad SEA(sin) > SEA(con) - Core frío:", SEA.B.cf.prob, "\n")
+
+# ------------------------------------------------------------
+# 6. Visualización de distribuciones SEA bayesianas
+# ------------------------------------------------------------
+# Combinar en un data frame largo para graficar
+SEA.all <- bind_rows(
+  data.frame(SEA = SEA.B.ct.sin, Manejo = "sin_manejo", Estacion = "core_templado"),
+  data.frame(SEA = SEA.B.ct.con, Manejo = "con_manejo", Estacion = "core_templado"),
+  data.frame(SEA = SEA.B.cf.sin, Manejo = "sin_manejo", Estacion = "core_frio"),
+  data.frame(SEA = SEA.B.cf.con, Manejo = "con_manejo", Estacion = "core_frio")
+)
+
+# Gráfico comparativo
+ggplot(SEA.all, aes(x = Manejo, y = SEA, fill = Manejo)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_wrap(~ Estacion, scales = "free_y") +
+  theme_minimal(base_size = 13) +
+  scale_fill_manual(values = c("tan3", "forestgreen")) +
+  labs(
+    title = "Comparación bayesiana de SEA por tipo de manejo y estación",
+    y = "Área elíptica estándar (SEA.B)",
+    x = "Tipo de manejo"
+  ) +
+  theme(legend.position = "none")
+
+
+# 5. Opcional: modelo bayesiano (MCMC)
+# -----------------------------
+ellipses.posterior <- siberMVN(siber.data)
+SEA.B <- siberEllipses(ellipses.posterior)
+apply(SEA.B, 2, mean)
+
+# -----------------------------
+# 6. Interpretación
+# -----------------------------
+# - Cada elipse representa la dispersión bivariada (temperatura-presión) de un grupo.
+# - El área de la elipse (SEA) mide cuán amplio es el rango conjunto de T y P.
+# - Comparar SEA entre grupos permite ver cuál tiene mayor "espacio ambiental ocupado".
+#################################################################################
+
 library(tidyverse)
 
 # Convertimos ambas matrices en data frames largos
@@ -383,95 +587,3 @@ ggplot(all_df %>% filter(metric %in% c("TA", "SEA")),
     y = "Área",
     fill="Métrica"
   )
-# -----------------------------
-# 2. Crear el objeto SIBER
-# -----------------------------
-# create the siber object
-siber.data<- createSiberObject(mydata2)
-
-siber.data.3<- createSiberObject(mydata3)
-
-# Calculate sumamry statistics for each group: TA, SEA and SEAc
-group.ML <- groupMetricsML(siber.data)
-print(group.ML)
-
-community.ML <- communityMetricsML(siber.data)
-print(community.ML)
-
-#core frio
-group.ML.3 <- groupMetricsML(siber.data.3)
-print(group.ML.3)
-
-community.ML.3 <- communityMetricsML(siber.data.3)
-print(community.ML.3)
-
-#graficar las metricas de comunidad
-#convertrir la tabla a formato largo
-library(tidyverse)
-
-# Convertimos la matriz a data frame largo
-comm_df <- as.data.frame(community.ML) %>%
-  rownames_to_column("metric") %>%
-  pivot_longer(cols = -metric, names_to = "community", values_to = "value")
-
-comm_df
-
-
-ggplot(comm_df, aes(x = community, y = value, fill = community)) +
-  geom_col(width = 0.6, color = "black") +
-  facet_wrap(~ metric, scales = "free_y") +
-  scale_fill_manual(values = c("tan3", "forestgreen")) +
-  theme_minimal(base_size = 13) +
-  labs(
-    title = "Comparación de métricas SIBER por tipo de manejo",
-    x = "Tipo de manejo",
-    y = "Valor de la métrica"
-  ) +
-  theme(legend.position="none")
-
-
-
-# Create lists of plotting arguments to be passed onwards to each 
-# of the three plotting functions.
-community.hulls.args <- list(col = 1, lty = 1, lwd = 1)
-group.ellipses.args  <- list(n = 100, p.interval = NULL, lty = 1, lwd = 2)
-
-group.hull.args      <- list(lty = 2)
-
-# -----------------------------
-# 3. Graficar los datos y las elipses
-# -----------------------------
-plotSiberObject(
-  siber.data,
-  ax.pad = 1,
-  hulls = FALSE,   # no mostrar convex hulls
-  ellipses = TRUE, # mostrar las elipses SEA
-  group.hulls.args = list(col = "gray"),
-  ellipses.args = list(n = 100, lwd = 2)
-)
-title("Espacio temperatura-presión (elipses SIBER)")
-
-# -----------------------------
-# 4. Calcular métricas de elipses
-# -----------------------------
-# SEA (Standard Ellipse Area)
-SEA <- siberEllipses(siber.data)
-SEA
-tapply(siber.data$original.data$iso1, siber.data$original.data$group, sd)
-tapply(siber.data$original.data$iso2, siber.data$original.data$group,sd)
-
-
-
-# -----------------------------
-# 5. Opcional: modelo bayesiano (MCMC)
-# -----------------------------
-ellipses.posterior <- siberMVN(siber.data)
-SEA.B <- siberEllipses(ellipses.posterior)
-apply(SEA.B, 2, mean)
-
-# -----------------------------
-# 6. Interpretación
-# -----------------------------
-# - Cada elipse representa la dispersión bivariada (temperatura-presión) de un grupo.
-# - El área de la elipse (SEA) mide cuán amplio es el rango conjunto de T y P.
-# - Comparar SEA entre grupos permite ver cuál tiene mayor "espacio ambiental ocupado".

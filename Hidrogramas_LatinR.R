@@ -83,6 +83,49 @@ dtw::dtw(h1, h5, keep.internals = TRUE) %>% plot()
 dtw::dtw(h1, h6, keep.internals = TRUE) %>% plot()
 dtw::dtw(h1, h7, keep.internals = TRUE) %>% plot()
 
+#Matriz de distancias DTW entre todos los arroyos
+# Crear lista de series por arroyo
+series <- hidrograma_diario %>%
+  group_by(arroyo) %>%
+  summarise(pabs_media = list(pabs_media)) %>%
+  deframe()  # convierte en lista nombrada
+
+# Crear una matriz vacía
+n <- length(series)
+dtw_matrix <- matrix(NA, nrow = n, ncol = n,
+                     dimnames = list(names(series), names(series)))
+
+# Calcular distancias DTW pareadas
+for (i in 1:n) {
+  for (j in 1:n) {
+    if (i < j) {
+      d <- dtw::dtw(series[[i]], series[[j]])$distance
+      dtw_matrix[i, j] <- d
+      dtw_matrix[j, i] <- d
+    }
+  }
+}
+
+dtw_matrix
+
+library(reshape2)
+
+dtw_melt <- melt(dtw_matrix, na.rm = TRUE)
+
+ggplot(dtw_melt, aes(Var1, Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "C") +
+  theme_minimal(base_size = 13) +
+  labs(title = "Similitud de hidrogramas (Distancia DTW)",
+       x = "Arroyo", y = "Arroyo", fill = "Distancia DTW")
+
+# Convertir distancia en similitud (1 = idénticos, 0 = muy diferentes)
+dtw_similarity <- 1 - (dtw_matrix / max(dtw_matrix, na.rm = TRUE))
+
+hc <- hclust(as.dist(dtw_matrix), method = "average")
+plot(hc, main = "Clustering de arroyos según hidrogramas DTW")
+
+###########esto funciona bien###############
 #Métricas hidrológicas para cada arroyo ----
 metricas_por_arroyo <- TP1 %>%
   group_by(arroyo) %>%
@@ -91,11 +134,112 @@ metricas_por_arroyo <- TP1 %>%
     sd_pabs   = sd(pabs, na.rm = TRUE),
     min_pabs  = min(pabs, na.rm = TRUE),
     max_pabs  = max(pabs, na.rm = TRUE),
-    cv_pabs   = sd_pabs / mean_pabs
+    cv_pabs   = sd_pabs / mean_pabs,
+    rango     = max_pabs - min_pabs
   )
 
 print(metricas_por_arroyo)
 
+##############
+# Calcular estadísticos básicos
+
+pabs <- "pabs"
+
+# a) Máximos y mínimos diarios
+diario <- TP1 %>%
+  group_by(arroyo, manejo, fecha) %>%
+  summarise(
+    max_pabs = max(.data[[pabs]], na.rm = TRUE),
+    min_pabs = min(.data[[pabs]], na.rm = TRUE),
+    mean_pabs = mean(.data[[pabs]], na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# b) Diferencias horarias (tasa de cambio)
+TP1 <- TP1 %>%
+  group_by(arroyo) %>%
+  arrange(fechahora) %>%
+  mutate(dpabs = c(NA, diff(.data[[pabs]]))) %>%
+  ungroup()
+
+# 4. Detección automática de eventos de crecida
+
+percentil_umbral <- 0.90
+duracion_min_h <- 2
+
+# Definir umbral por arroyo (percentil 95)
+umbral <- TP1 %>%
+  group_by(arroyo) %>%
+  summarise(threshold = quantile(pabs, percentil_umbral, na.rm = TRUE))
+
+#dejo las dos opciones de mutate porque a veces me falla una y no toma a threshold como variable
+TP1 <- TP1 %>%
+  left_join(umbral, by = "arroyo") %>%
+  mutate(sobre_umbral = pabs > threshold)
+
+TP1 <- left_join(TP1, umbral, by = "arroyo")
+TP1 <- TP1 %>%
+  mutate(sobre_umbral = pabs > threshold)
+
+
+# 5. Detectar eventos de crecida continuos (≥3 horas sobre umbral)
+
+TP1_dt <- as.data.table(TP1)
+TP1_dt[, evento_id := rleid(sobre_umbral), by = arroyo]
+eventos_tabla <- TP1_dt[sobre_umbral == TRUE, .(
+  inicio = min(fechahora),
+  fin = max(fechahora),
+  duracion_h = as.numeric(difftime(max(fechahora), min(fechahora), units = "hours")),
+  pico = max(get("pabs"), na.rm = TRUE)
+), by = .(arroyo, manejo, evento_id)]
+
+
+# Filtrar eventos cortos (< 3 horas)
+eventos_filtrados <- eventos_tabla[duracion_h >= duracion_min_h]
+
+# 6. Graficar resultados
+# Serie temporal con umbral y eventos detectados
+ggplot(TP1, aes(x = fechahora, y = .data[[pabs]], color = manejo)) +
+  geom_line(alpha = 0.7) +
+  geom_hline(aes(yintercept = threshold), linetype = "dashed", color = "red") +
+  geom_point(
+    data = eventos_filtrados,
+    aes(x = inicio, y = pico),
+    color = "black", size = 2
+  ) +
+  facet_wrap(~ arroyo, scales = "free_y") +
+  theme_minimal() +
+  labs(
+    title = "Eventos de crecida detectados automáticamente",
+    x = "Fecha-Hora", y = "pabs"
+  )
+
+# 7. Comparación entre grupos (manejo)
+
+# Resumen por manejo
+comparacion <- diario %>%
+  group_by(manejo) %>%
+  summarise(
+    media_max = mean(max_pabs, na.rm = TRUE),
+    cv_max = sd(max_pabs, na.rm = TRUE) / mean(max_pabs, na.rm = TRUE),
+    media_min = mean(min_pabs, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Test t de diferencias entre grupos (máximos diarios)
+t.test(max_pabs ~ manejo, data = diario)
+
+install.packages("effectsize")
+library(effectsize)
+t_test_res <- t.test(max_pabs ~ manejo, data = diario)
+cohens_d(max_pabs ~ manejo, data = diario)
+
+ggplot(diario, aes(x = manejo, y = max_pabs, fill = manejo)) +
+  geom_boxplot(alpha = 0.6) +
+  theme_minimal() +
+  labs(title = "Comparación de máximos diarios de pabs por manejo",
+       y = "Máximo diario de pabs", x = "Tipo de manejo")
+########
 ##################################
 #https://rpubs.com/marenas/917409
 #los análisis aquí descriptos precisan de un dato diario, no aceptan uno por hora
@@ -112,12 +256,8 @@ library(lubridate)
 library(ggplot2)
 library(EflowStats)
 
-#Conversion de los Datos Cargados a Formato Serie de Tiempo
-head(TP1)
-tail(TP1)
 
 #Crear lista de series zoo, una por arroyo
-
 ###hidrograma diario 2 tiene pabs media por día porque necesita un valor diario
 hidrograma_diario2 <- TP1 %>%
   mutate(fecha = as_date(fecha)) %>%
@@ -237,22 +377,12 @@ calc_allHIT(para_calc,yearType = "calendar",stats = "all",
 names(metricas_hidrostats) <- unique(TP1$arroyo)
 
 #######################################################
-#Perspectiva de series de tiem´p ára no perder datos
+#Perspectiva de series de tiempo para no perder datos
 library(zoo)
 library(hydrostats)
 library(dtw)
 library(xts)
+library(pracma)       # findpeaks
 
-TP2 <- TP1 %>%
-  mutate(datetime = as.POSIXct(paste(fecha, horaredonda),
-                               format = "%Y-%m-%d %H",
-                               tz = "UTC") ) %>% 
-  mutate(pabs = as.numeric(pabs)) %>%
-  arrange(arroyo, datetime) %>% 
-  select(-fechahora)
-
-serie_xts <- xts(TP2$pabs, order.by = TP2$datetime)
-head(serie_xts)
-periodicity(serie_xts) 
 
 
