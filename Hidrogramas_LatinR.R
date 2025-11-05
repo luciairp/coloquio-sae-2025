@@ -164,7 +164,7 @@ TP1 <- TP1 %>%
 
 # 4. Detección automática de eventos de crecida
 
-percentil_umbral <- 0.90
+percentil_umbral <- 0.75
 duracion_min_h <- 2
 
 # Definir umbral por arroyo (percentil 95)
@@ -239,6 +239,122 @@ ggplot(diario, aes(x = manejo, y = max_pabs, fill = manejo)) +
   theme_minimal() +
   labs(title = "Comparación de máximos diarios de pabs por manejo",
        y = "Máximo diario de pabs", x = "Tipo de manejo")
+
+###############################################
+###analisis con un dato diario y mensual
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(effectsize)
+
+pabs <- "pabs"
+percentil_umbral <- 0.75   # umbral más sensible
+duracion_min_d <- 2        # duración mínima en días
+
+# --- 1. Promedio diario por arroyo y manejo ---
+data_diaria <- TP1 %>%
+  group_by(arroyo, manejo, fecha) %>%
+  summarise(
+    mean_pabs = mean(.data[[pabs]], na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# --- 2. Umbral por arroyo (percentil 70 de los promedios diarios) ---
+umbral_dia <- data_diaria %>%
+  group_by(arroyo) %>%
+  summarise(threshold = quantile(mean_pabs, percentil_umbral, na.rm = TRUE))
+
+# --- 3. Detección de eventos de crecida diaria ---
+data_diaria <- data_diaria %>%
+  left_join(umbral_dia, by = "arroyo") %>%
+  mutate(sobre_umbral = mean_pabs > threshold)
+
+data_diaria_dt <- as.data.table(data_diaria)
+data_diaria_dt[, evento_id := rleid(sobre_umbral), by = arroyo]
+
+eventos_diarios <- data_diaria_dt[sobre_umbral == TRUE, .(
+  inicio = min(fecha),
+  fin = max(fecha),
+  duracion_d = as.numeric(difftime(max(fecha), min(fecha), units = "days")),
+  pico = max(mean_pabs, na.rm = TRUE)
+), by = .(arroyo, manejo, evento_id)]
+
+# Filtrar eventos cortos (< 2 días)
+eventos_diarios_filtrados <- eventos_diarios[duracion_d >= duracion_min_d]
+
+# --- 4. Graficar resultados diarios ---
+ggplot(data_diaria, aes(x = fecha, y = mean_pabs, color = manejo)) +
+  geom_line(alpha = 0.7) +
+  geom_hline(aes(yintercept = threshold), linetype = "dashed", color = "red") +
+  geom_point(data = eventos_diarios_filtrados,
+             aes(x = inicio, y = pico),
+             color = "black", size = 2) +
+  facet_wrap(~ arroyo, scales = "free_y") +
+  theme_minimal() +
+  labs(
+    title = "Eventos de crecida detectados (datos diarios)",
+    x = "Fecha", y = "pabs promedio diario"
+  )
+
+# --- 5. Comparación entre manejos (diaria) ---
+t.test(mean_pabs ~ manejo, data = data_diaria)
+cohens_d(mean_pabs ~ manejo, data = data_diaria)
+
+#############################
+pabs <- "pabs"
+percentil_umbral <- 0.50   # umbral más sensible
+duracion_min_d <- 1        # duración mínima en meses
+# --- 1. Promedio mensual ---
+data_mensual <- TP1 %>%
+  mutate(mes = format(fechahora, "%Y-%m")) %>%
+  group_by(arroyo, manejo, mes) %>%
+  summarise(
+    mean_pabs = mean(.data[[pabs]], na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# --- 2. Umbral mensual (percentil 75) ---
+umbral_mes <- data_mensual %>%
+  group_by(arroyo) %>%
+  summarise(threshold = quantile(mean_pabs, percentil_umbral, na.rm = TRUE))
+
+# --- 3. Detección de eventos de crecida mensual ---
+data_mensual <- data_mensual %>%
+  left_join(umbral_mes, by = "arroyo") %>%
+  mutate(sobre_umbral = mean_pabs > threshold)
+
+data_mensual_dt <- as.data.table(data_mensual)
+data_mensual_dt[, evento_id := rleid(sobre_umbral), by = arroyo]
+
+eventos_mensuales <- data_mensual_dt[sobre_umbral == TRUE, .(
+  inicio = min(mes),
+  fin = max(mes),
+  duracion_m = as.numeric(difftime(as.Date(paste0(max(mes), "-01")),
+                                   as.Date(paste0(min(mes), "-01")),
+                                   units = "days")) / 30,
+  pico = max(mean_pabs, na.rm = TRUE)
+), by = .(arroyo, manejo, evento_id)]
+
+# Filtrar eventos cortos (< 2 meses)
+eventos_mensuales_filtrados <- eventos_mensuales[duracion_m >= 2]
+
+# --- 4. Graficar resultados mensuales ---
+ggplot(data_mensual, aes(x = as.Date(paste0(mes, "-01")), y = mean_pabs, color = manejo)) +
+  geom_line(alpha = 0.7) +
+  geom_hline(aes(yintercept = threshold), linetype = "dashed", color = "red") +
+  geom_point(data = eventos_mensuales_filtrados,
+             aes(x = as.Date(paste0(inicio, "-01")), y = pico),
+             color = "black", size = 2) +
+  facet_wrap(~ arroyo, scales = "free_y") +
+  theme_minimal() +
+  labs(
+    title = "Eventos de crecida detectados (datos mensuales)",
+    x = "Mes", y = "pabs promedio mensual"
+  )
+
+# --- 5. Comparación entre manejos (mensual) ---
+t.test(mean_pabs ~ manejo, data = data_mensual)
+cohens_d(mean_pabs ~ manejo, data = data_mensual)
 ########
 ##################################
 #https://rpubs.com/marenas/917409
