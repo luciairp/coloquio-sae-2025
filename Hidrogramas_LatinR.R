@@ -3,6 +3,7 @@
 #https://rpubs.com/marenas/917409
 
 rm(list = ls())
+graphics.off()
 library(tidyverse)
 library(lubridate)
 library(readxl)
@@ -82,6 +83,22 @@ dtw::dtw(h1, h4, keep.internals = TRUE) %>% plot()
 dtw::dtw(h1, h5, keep.internals = TRUE) %>% plot()
 dtw::dtw(h1, h6, keep.internals = TRUE) %>% plot()
 dtw::dtw(h1, h7, keep.internals = TRUE) %>% plot()
+dtw::dtw(h2, h3, keep.internals = TRUE) %>% plot()
+dtw::dtw(h2, h4, keep.internals = TRUE) %>% plot()
+dtw::dtw(h2, h5, keep.internals = TRUE) %>% plot()
+dtw::dtw(h2, h6, keep.internals = TRUE) %>% plot()
+dtw::dtw(h2, h7, keep.internals = TRUE) %>% plot()
+dtw::dtw(h3, h4, keep.internals = TRUE) %>% plot()
+dtw::dtw(h3, h5, keep.internals = TRUE) %>% plot()
+dtw::dtw(h3, h6, keep.internals = TRUE) %>% plot()
+dtw::dtw(h3, h7, keep.internals = TRUE) %>% plot()
+dtw::dtw(h4, h5, keep.internals = TRUE) %>% plot()
+dtw::dtw(h4, h6, keep.internals = TRUE) %>% plot()
+dtw::dtw(h4, h7, keep.internals = TRUE) %>% plot()
+dtw::dtw(h5, h6, keep.internals = TRUE) %>% plot()
+dtw::dtw(h5, h7, keep.internals = TRUE) %>% plot()
+dtw::dtw(h6, h7, keep.internals = TRUE) %>% plot()
+
 
 #Matriz de distancias DTW entre todos los arroyos
 # Crear lista de series por arroyo
@@ -107,10 +124,17 @@ for (i in 1:n) {
 }
 
 dtw_matrix
+round(dtw_similarity, 3)
+orden_arroyos <- c("16", "20", "96", "55", "69", "71", "73")
 
 library(reshape2)
-
 dtw_melt <- melt(dtw_matrix, na.rm = TRUE)
+
+# Fijar el orden de los factores (etiquetas de ejes)
+orden_arroyos <- rownames(dtw_matrix)
+dtw_melt$Var1 <- factor(dtw_melt$Var1, levels = orden_arroyos)
+dtw_melt$Var2 <- factor(dtw_melt$Var2, levels = orden_arroyos)
+
 
 ggplot(dtw_melt, aes(Var1, Var2, fill = value)) +
   geom_tile(color = "white") +
@@ -118,12 +142,32 @@ ggplot(dtw_melt, aes(Var1, Var2, fill = value)) +
   theme_minimal(base_size = 13) +
   labs(title = "Similitud de hidrogramas (Distancia DTW)",
        x = "Arroyo", y = "Arroyo", fill = "Distancia DTW")
+#distancia dtw a menor valor los hidrogramas son mas parecidos
 
-# Convertir distancia en similitud (1 = idénticos, 0 = muy diferentes)
+#######
 dtw_similarity <- 1 - (dtw_matrix / max(dtw_matrix, na.rm = TRUE))
+dtw_sim_melt <- melt(dtw_similarity, na.rm = TRUE)
 
+dtw_sim_melt$Var1 <- factor(dtw_sim_melt$Var1, levels = orden_arroyos)
+dtw_sim_melt$Var2 <- factor(dtw_sim_melt$Var2, levels = orden_arroyos)
+
+ggplot(dtw_sim_melt, aes(Var1, Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "C", name = "Similitud (1 - DTW)") +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    title = "Matriz de similitud de hidrogramas (DTW normalizada)",
+    x = "Arroyo", y = "Arroyo"
+  )
+###valores cercanos a 1 indican arroyos con formas de hidrogramas más similares
+###
+
+
+###cluster
 hc <- hclust(as.dist(dtw_matrix), method = "average")
 plot(hc, main = "Clustering de arroyos según hidrogramas DTW")
+
 
 ###########esto funciona bien###############
 #Métricas hidrológicas para cada arroyo ----
@@ -164,7 +208,7 @@ TP1 <- TP1 %>%
 
 # 4. Detección automática de eventos de crecida
 
-percentil_umbral <- 0.75
+percentil_umbral <- 0.85
 duracion_min_h <- 2
 
 # Definir umbral por arroyo (percentil 95)
@@ -229,10 +273,14 @@ comparacion <- diario %>%
 # Test t de diferencias entre grupos (máximos diarios)
 t.test(max_pabs ~ manejo, data = diario)
 
-install.packages("effectsize")
+#install.packages("effectsize")
 library(effectsize)
 t_test_res <- t.test(max_pabs ~ manejo, data = diario)
 cohens_d(max_pabs ~ manejo, data = diario)
+#> cohens_d(max_pabs ~ manejo, data = diario)
+#Cohen's d |       95% CI
+#------------------------
+#0.07      | [0.00, 0.15
 
 ggplot(diario, aes(x = manejo, y = max_pabs, fill = manejo)) +
   geom_boxplot(alpha = 0.6) +
@@ -248,7 +296,7 @@ library(ggplot2)
 library(effectsize)
 
 pabs <- "pabs"
-percentil_umbral <- 0.75   # umbral más sensible
+percentil_umbral <- 0.85   # umbral más sensible
 duracion_min_d <- 2        # duración mínima en días
 
 # --- 1. Promedio diario por arroyo y manejo ---
@@ -299,8 +347,12 @@ ggplot(data_diaria, aes(x = fecha, y = mean_pabs, color = manejo)) +
 # --- 5. Comparación entre manejos (diaria) ---
 t.test(mean_pabs ~ manejo, data = data_diaria)
 cohens_d(mean_pabs ~ manejo, data = data_diaria)
+#> cohens_d(mean_pabs ~ manejo, data = data_diaria)
+#Cohen's d |       95% CI
+#------------------------
+#0.08      | [0.01, 0.16]
 
-#############################
+############################# mensual
 pabs <- "pabs"
 percentil_umbral <- 0.50   # umbral más sensible
 duracion_min_d <- 1        # duración mínima en meses
@@ -500,5 +552,52 @@ library(dtw)
 library(xts)
 library(pracma)       # findpeaks
 
+library(dplyr)
+library(zoo)
+library(ggplot2)
+
+# hidrograma_diario tiene fecha, arroyo y pabs_media
+
+# 1️ Detectar picos de crecida por arroyo -------------------------
+picos_por_arroyo <- hidrograma_diario %>%
+  group_by(arroyo) %>%
+  arrange(fecha) %>%
+  mutate(
+    # Calcular umbral de crecida (percentil 90)
+    umbral = quantile(pabs_media, 0.90, na.rm = TRUE),
+    # Detectar picos: un punto mayor a los vecinos y que supere el umbral
+    es_pico = pabs_media > lag(pabs_media) & 
+      pabs_media > lead(pabs_media) & 
+      pabs_media > umbral
+  ) %>%
+  summarise(
+    n_picos = sum(es_pico, na.rm = TRUE),
+    mean_pabs = mean(pabs_media, na.rm = TRUE),
+    manejo = first(TP1$manejo[TP1$arroyo == unique(arroyo)]) # asociar manejo
+  )
+
+#2 Comparar número de picos entre grupos de manejo --------------
+ggplot(picos_por_arroyo, aes(x = manejo, y = n_picos, fill = manejo)) +
+  geom_boxplot(alpha = 0.6) +
+  geom_jitter(width = 0.1, size = 3, alpha = 0.8) +
+  theme_minimal() +
+  labs(
+    title = "Número de picos de crecida por arroyo",
+    x = "Manejo", y = "Cantidad de picos detectados"
+  )
+
+# 3 Test estadístico y tamaño de efecto -------------------------
+library(rstatix)
+
+picos_por_arroyo <- picos_por_arroyo %>%
+  mutate(n_picos = as.numeric(n_picos))
+
+picos_por_arroyo <- picos_por_arroyo %>%
+  mutate(
+    n_picos = as.numeric(n_picos),
+    manejo = as.factor(manejo)
+  )
+
+cohens_d(n_picos ~ manejo, data = picos_por_arroyo)
 
 
