@@ -208,7 +208,9 @@ TP_hora <- TP1 %>%
   filter(horaredonda == 0)
 
 head(TP_hora)
-
+levels(TP_hora$season)
+TP_hora$season <- factor(TP_hora$season,
+                         levels = c("core_templado","templado","core_frio","frio"))
 ######################
 #elipses todas las horas
 biplot <- ggplot(TP,aes(y=temp,x=pabs,colour = arroyo, z=arroyo))+
@@ -237,7 +239,15 @@ biplot_0
 biplot_00 <- ggplot(TP_hora, aes(x = pabs, y = temp, colour = manejo)) +
   stat_ellipse(aes(group = arroyo, color = manejo), level = 0.40)+
   facet_grid(.~season) +
-  theme_light()
+  theme_light(base_size = 13)+
+  labs(
+    x= "Presión Absoluta (hPa)",
+    y= "Temperatura del agua (°C)")+
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    legend.position = "right"
+  )
 biplot_00
 
 #elipses con datos de solo una hora y para las estaciones core frio y core templado
@@ -247,7 +257,15 @@ TP_hora.2 <- TP_hora %>%
 biplot_000 <- ggplot(TP_hora.2, aes(x = pabs, y = temp, colour = manejo)) +
   stat_ellipse(aes(group = arroyo, color = manejo), level = 0.40)+
   facet_grid(.~season) +
-  theme_light()
+  theme_light(base_size = 13)+
+  labs(
+    x= "Presión Absoluta (hPa)",
+    y= "Temperatura del agua (°C)")+
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    legend.position = "right"
+  )
 biplot_000
 
 #####elipses por arroyo
@@ -484,15 +502,15 @@ ellipses.post.cf <- siberMVN(siber.data.3, parms, priors)
 # Core templado
 SEA.B.ct <- siberEllipses(ellipses.post.ct)
 SEA.B.ct.summary <- siberDensityPlot(SEA.B.ct, xticklabels = levels(mydata2$group), 
-                                     xlab = "Grupos", ylab = "SEA (bayesiana)",
-                                     main = "Distribución posterior SEA - core templado")
+                                     xlab = "Arroyos", ylab = "SEA (bayesiana)",
+                                     main = "core_templado")
 SEA.B.ct.summary
 
 # Core frío
 SEA.B.cf <- siberEllipses(ellipses.post.cf)
 SEA.B.cf.summary <- siberDensityPlot(SEA.B.cf, xticklabels = levels(mydata3$group),
-                                     xlab = "Grupos", ylab = "SEA (bayesiana)",
-                                     main = "Distribución posterior SEA - core frío")
+                                     xlab = "Arroyos", ylab = "SEA (bayesiana)",
+                                     main = "core_frío")
 SEA.B.cf.summary
 
 colnames(SEA.B.ct) <- c("16","20","96","55","69","71","73")
@@ -535,7 +553,7 @@ ggplot(SEA.all, aes(x = Manejo, y = SEA, fill = Manejo)) +
   theme_minimal(base_size = 13) +
   scale_fill_manual(values = c("tan3", "forestgreen")) +
   labs(
-    title = "Comparación bayesiana de SEA por tipo de manejo y estación",
+    title = "Comparación de SEA por tipo de manejo y estación",
     y = "Área elíptica estándar (SEA.B)",
     x = "Tipo de manejo"
   ) +
@@ -587,3 +605,4 @@ ggplot(all_df %>% filter(metric %in% c("TA", "SEA")),
     y = "Área",
     fill="Métrica"
   )
+
