@@ -109,6 +109,8 @@ series <- hidrograma_diario %>%
 
 # Crear una matriz vacía
 n <- length(series)
+
+
 dtw_matrix <- matrix(NA, nrow = n, ncol = n,
                      dimnames = list(names(series), names(series)))
 
@@ -124,7 +126,7 @@ for (i in 1:n) {
 }
 
 dtw_matrix
-round(dtw_similarity, 3)
+round(dtw_matrix, 3)
 orden_arroyos <- c("16", "20", "96", "55", "69", "71", "73")
 
 library(reshape2)
@@ -157,7 +159,7 @@ ggplot(dtw_sim_melt, aes(Var1, Var2, fill = value)) +
   theme_minimal(base_size = 13) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(
-    title = "Matriz de similitud de hidrogramas (DTW normalizada)",
+    title = "Matriz de similitud de hidrogramas",
     x = "Arroyo", y = "Arroyo"
   )
 ###valores cercanos a 1 indican arroyos con formas de hidrogramas más similares
@@ -166,7 +168,7 @@ ggplot(dtw_sim_melt, aes(Var1, Var2, fill = value)) +
 
 ###cluster
 hc <- hclust(as.dist(dtw_matrix), method = "average")
-plot(hc, main = "Clustering de arroyos según hidrogramas DTW")
+plot(hc, main = "Similitud DTW")
 
 
 ###########esto funciona bien###############
@@ -208,7 +210,7 @@ TP1 <- TP1 %>%
 
 # 4. Detección automática de eventos de crecida
 
-percentil_umbral <- 0.85
+percentil_umbral <- 0.90
 duracion_min_h <- 2
 
 # Definir umbral por arroyo (percentil 95)
@@ -296,7 +298,7 @@ library(ggplot2)
 library(effectsize)
 
 pabs <- "pabs"
-percentil_umbral <- 0.85   # umbral más sensible
+percentil_umbral <- 0.90   # umbral más sensible
 duracion_min_d <- 2        # duración mínima en días
 
 # --- 1. Promedio diario por arroyo y manejo ---
