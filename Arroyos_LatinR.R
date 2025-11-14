@@ -552,11 +552,8 @@ ggplot(SEA.all, aes(x = Manejo, y = SEA, fill = Manejo)) +
   facet_wrap(~ Estacion, scales = "free_y") +
   theme_minimal(base_size = 13) +
   scale_fill_manual(values = c("tan3", "forestgreen")) +
-  labs(
-    title = "Comparación de SEA por tipo de manejo y estación",
-    y = "Área elíptica estándar (SEA.B)",
-    x = "Tipo de manejo"
-  ) +
+  labs(y = "Área elíptica estándar (SEA.B)",
+    x = "Tipo de manejo")+
   theme(legend.position = "none")
 
 
