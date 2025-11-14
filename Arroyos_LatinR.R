@@ -331,12 +331,12 @@ mydata <- data_arroyos %>%
 mydata2 <- mydata %>%
   filter(horaredonda == 0) %>% 
   filter(season == "core_templado") %>% 
-  select(iso1 = pabs, iso2 = temp, group = arroyo)
+  select(iso1 = pabs, iso2 = temp, group = manejo)
 
 mydata3 <- mydata %>%
   filter(horaredonda == 0) %>% 
   filter(season == "core_frio") %>% 
-  select(iso1 = pabs, iso2 = temp, group = arroyo)
+  select(iso1 = pabs, iso2 = temp, group = manejo)
 
 # Agregar una nueva columna llamada "community" con valor 1
 mydata2 <- mydata2 %>%
@@ -355,7 +355,7 @@ mydata2<-as.data.frame(mydata2)
 mydata2$group<-as.factor(mydata2$group)
 mydata2$community<-as.factor(mydata2$community)
 
-#ahora cor-frio
+#ahora core-frio
 mydata3 <- mydata3 %>%
   mutate(community = "all")
 
@@ -382,6 +382,7 @@ siber.data.3<- createSiberObject(mydata3)
 
 # Calculate sumamry statistics for each group: TA, SEA and SEAc
 group.ML <- groupMetricsML(siber.data)
+# core frio
 print(group.ML)
 
 community.ML <- communityMetricsML(siber.data)
@@ -501,10 +502,18 @@ ellipses.post.cf <- siberMVN(siber.data.3, parms, priors)
 
 # Core templado
 SEA.B.ct <- siberEllipses(ellipses.post.ct)
+
+my_clrs <- matrix(c("#F8BBB3", "#F88F87", "#F4746B",
+                  "#7ECEFF", "#5AB6FF", "#6CAFFF"), nrow = 3, ncol = 2)
 SEA.B.ct.summary <- siberDensityPlot(SEA.B.ct, xticklabels = levels(mydata2$group), 
-                                     xlab = "Arroyos", ylab = "SEA (bayesiana)",
-                                     main = "core_templado")
+                                     xlab = "Manejo", ylab = "SEA.B",
+                                     main = "core_templado",
+                                     clr = my_clrs)
 SEA.B.ct.summary
+colours()
+
+
+
 
 # Core frío
 SEA.B.cf <- siberEllipses(ellipses.post.cf)
